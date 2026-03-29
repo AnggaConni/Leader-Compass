@@ -72,7 +72,7 @@ This tool integrates multiple research-backed models:
 
 ## 🧪 Status
 
-This is an **early prototype (v)0.3)**.
+This is an **early prototype (version 0.3)**.
 
 Expect:
 - rough edges  
