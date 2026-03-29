@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Leader's Compass • V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { font-family: 'Plus Jakarta Sans', sans-serif; box-sizing: border-box; }
+        body { background: #eef1f9; min-height: 100vh; }
+        body::before { content:''; position:fixed; inset:0; background-image:radial-gradient(circle at 1.5px 1.5px,#c7cde6 1.5px,transparent 0); background-size:30px 30px; pointer-events:none; opacity:0.3; z-index:0; }
+        #root { position:relative; z-index:1; }
+
+        .mono { font-family:'DM Mono',monospace; }
+        .glass { background:rgba(255,255,255,0.97); border-radius:1.25rem; box-shadow:0 4px 24px rgba(49,46,129,0.08), 0 1px 4px rgba(0,0,0,0.04); border:1px solid #e8ecf5; }
+        .glass-hi { background:#fff; border-radius:1.25rem; box-shadow:0 8px 40px rgba(49,46,129,0.12), 0 2px 8px rgba(0,0,0,0.06); border:1px solid #dce3f5; }
+
+        /* Sliders */
+        .slider { -webkit-appearance:none; width:100%; height:5px; border-radius:10px; background:#e2e8f0; outline:none; cursor:pointer; }
+        .slider::-webkit-slider-thumb { -webkit-appearance:none; width:17px; height:17px; border-radius:50%; background:#6366f1; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.25); transition:transform 0.15s; }
+        .slider::-webkit-slider-thumb:hover { transform:scale(1.25); }
+        .slider-red::-webkit-slider-thumb { background:#ef4444; }
+        .slider-green::-webkit-slider-thumb { background:#10b981; }
+        .slider-amber::-webkit-slider-thumb { background:#f59e0b; }
+        .slider-rose::-webkit-slider-thumb { background:#f43f5e; }
+
+        /* Dynamic slider containers */
+        .sval-bad { background:#fef2f2; border-color:#fecaca !important; }
+        .sval-ok  { background:#ffffff; border-color:#e2e8f0 !important; }
+        .sval-good{ background:#f0fdf4; border-color:#bbf7d0 !important; }
+        .sval-amber{ background:#fffbeb; border-color:#fde68a !important; }
+
+        /* JD-R balance */
+        .jdr-gradient { background:linear-gradient(to right, #fee2e2 0%, #fef9c3 45%, #dcfce7 100%); }
+
+        /* Diagnosis types */
+        .diag-red    { border-left:4px solid #dc2626; background:#fef2f2; }
+        .diag-amber  { border-left:4px solid #d97706; background:#fffbeb; }
+        .diag-indigo { border-left:4px solid #6366f1; background:#eef2ff; }
+        .diag-green  { border-left:4px solid #059669; background:#f0fdf4; }
+        .diag-rose   { border-left:4px solid #f43f5e; background:#fff1f2; }
+
+        /* Score bars */
+        .score-fill { transition:width 0.6s cubic-bezier(0.4,0,0.2,1); }
+
+        /* AI panel */
+        .ai-gradient { background:linear-gradient(135deg,#eef2ff 0%,#f0fdf4 100%); border:1px solid #c7d2fe; }
+
+        /* Badges */
+        .badge-jcm { background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; font-size:0.65rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; padding:2px 8px; border-radius:20px; }
+        .badge-jdr { background:#ecfdf5; color:#065f46; border:1px solid #86efac; font-size:0.65rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; padding:2px 8px; border-radius:20px; }
+
+        /* Research link */
+        .rlink { transition:all 0.15s; border-left:2px solid transparent; }
+        .rlink:hover { background:#f1f5f9; border-left-color:#6366f1; padding-left:0.5rem; }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width:5px; height:5px; }
+        ::-webkit-scrollbar-track { background:#f1f5f9; }
+        ::-webkit-scrollbar-thumb { background:#c7d2fe; border-radius:3px; }
+
+        /* Pulse animation for AI */
+        @keyframes pulse-dot { 0%,80%,100%{transform:scale(0);opacity:0.5} 40%{transform:scale(1);opacity:1} }
+        .pulse-dot span { display:inline-block; width:6px; height:6px; border-radius:50%; background:#6366f1; margin:0 2px; animation:pulse-dot 1.2s infinite ease-in-out; }
+        .pulse-dot span:nth-child(2){animation-delay:0.2s} .pulse-dot span:nth-child(3){animation-delay:0.4s}
+
+        /* Fade in */
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .fade-in { animation:fadeIn 0.3s ease both; }
+
+        /* Table */
+        th { font-weight:600; font-size:0.7rem; letter-spacing:0.05em; text-transform:uppercase; }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ───────────────────────── TRANSLATIONS ───────────────────────── */
+const T = {
+  id: {
+    appTitle: "Leader's Compass", appVersion: "V3 • Invisible Assessment",
+    appSubtitle: "Obrolan Santai → Diagnostik Berbasis Riset",
+    langToggle: "English",
+    introText: "🔍 Dirancang untuk pemimpin saat ngobrol informal. Gunakan pertanyaan 'samaran' untuk membaca kondisi tim tanpa memicu Hawthorne Effect — tanpa angket resmi, tanpa bias jawaban sosial.",
+    warningTitle: "📜 Etika Kepemimpinan",
+    rule1: "Data ini HANYA untuk refleksi pribadi leader — bukan penilaian formal atau hukuman.",
+    rule2: "Setiap penambahan tanggung jawab WAJIB disertai bentuk pengakuan (KPI, pujian, kompensasi).",
+    rule3: "Prinsip: 'Bisa tanam padi tapi dibilang gak bisa' adalah trauma yang harus dihindari.",
+    memberName: "Nama Anggota Tim",
+    namePlaceholder: "contoh: Sari Dewi",
+    sectionInput: "Input Observasi",
+    labelJCM: "Model Karakteristik Pekerjaan (JCM)",
+    jcmDesc: "Lima dimensi inti yang menentukan motivasi intrinsik (Hackman & Oldham, 1976)",
+    labelJDR: "Model Job Demands-Resources (JD-R)",
+    jdrDesc: "Konteks kerja: beban, dukungan, dan sumber daya psikologis (Bakker & Demerouti, 2007)",
+    section1Desc: "Geser slider berdasarkan jawaban natural dari obrolan. 1 = Rendah/Bahaya, 5 = Sehat/Tinggi.",
+
+    dimVariety: "Variasi Tugas", qVariety: "Minggu ini ada tantangan baru nggak, atau kerjanya masih 'gitu-gitu' aja?", lblVLow: "Monoton", lblVHigh: "Sangat bervariasi",
+    dimAutonomy: "Otonomi", qAutonomy: "Kalau kamu pegang kendali penuh di proyek ini, bagian mana yang mau diubah?", lblALow: "Tunggu perintah", lblAHigh: "Mandiri eksekusi",
+    dimIdentity: "Identitas Tugas", qIdentity: "Kamu kebayang nggak hasil akhir dari kerjamu ini buat apa?", lblILow: "Hanya potongan", lblIHigh: "Utuh & jelas",
+    dimSignificance: "Dampak Tugas", qSignificance: "Kerjaanmu berdampak langsung ke orang lain atau tim?", lblSLow: "Tak terasa", lblSHigh: "Dampak besar",
+    dimFeedback: "Umpan Balik", qFeedback: "Ngerasa 'meraba-raba' nggak kalau kerjaanmu sudah sesuai standar?", lblFLow: "Meraba-raba", lblFHigh: "Sangat jelas",
+
+    dimWorkload: "Beban Kerja", qWorkload: "Gimana ritme kerja sekarang — masih sempat napas atau malah kurang tantangan?", lblWLow: "Kewalahan", lblWHigh: "Kurang tantangan",
+    dimSupport: "Dukungan Sosial", qSupport: "Kalau lagi mentok, gampang nggak cari teman diskusi atau bantuan?", lblSupLow: "Sendirian/Terisolasi", lblSupHigh: "Sangat didukung",
+    dimRoleClarity: "Kejelasan Peran", qRoleClarity: "Kalau ada meeting mendadak soal ekspektasi peranmu, seberapa siap kamu menjelaskan prioritas kerjaanmu?", lblRCLow: "Ambiguitas tinggi", lblRCHigh: "Sangat jelas",
+    dimPsychSafety: "Keamanan Psikologis", qPsychSafety: "Kalau punya ide atau beda pendapat sama atasan, nyaman nggak buat langsung ngomong?", lblPSLow: "Sangat takut salah", lblPSHigh: "Bebas bicara",
+    dimGrowth: "Peluang Berkembang", qGrowth: "Ngerasa skill dan kapabilitas kamu berkembang di posisi ini?", lblGLow: "Stagnan/Mentok", lblGHigh: "Berkembang pesat",
+
+    chartTitle: "Profil 10 Dimensi",
+    chartLabels: ["Variasi","Otonomi","Identitas","Signifikansi","Feedback","Beban Kerja","Dukungan","Kejelasan Peran","Psych Safety","Pertumbuhan"],
+
+    scoreTitle: "Dashboard Skor",
+    mpsLabel: "MPS", mpsFormula: "(Variasi+Identitas+Signifikansi)/3 × Otonomi × Feedback",
+    engLabel: "Indeks Keterlibatan", engDesc: "Berdasarkan MPS, Pertumbuhan, Psych Safety, Kejelasan Peran",
+    burnLabel: "Risiko Burnout", burnDesc: "Berdasarkan Beban Kerja, Dukungan, Psych Safety",
+    jdrLabel: "Keseimbangan JD-R",
+    jdrDemand: "Tuntutan Tinggi", jdrResource: "Sumber Daya Cukup",
+
+    diagTitle: "Diagnosis & Rekomendasi",
+    researchSource: "📚 Sumber riset:",
+    secondaryFlags: "⚠️ Tanda Tambahan:",
+
+    actionTitle: "Rencana Tindakan & Pengakuan",
+    newTaskLbl: "Tanggung Jawab / Tantangan Baru",
+    recogLbl: "⭐ Wajib: Bentuk Komitmen Pengakuan",
+    recogDesc: "Pilih komitmen pengakuan atas penambahan tugas/otoritas.",
+    chkKpi: "Penyesuaian KPI/Target", chkPublic: "Pujian Publik / Apresiasi Tim", chkBonus: "Kompensasi / Bonus", chkCareer: "Rotasi / Proyeksi Karir",
+    notesLbl: "Catatan Tambahan",
+    notesPlaceholder: "Konteks penting, observasi tambahan...",
+    recogOtherPlaceholder: "Bentuk pengakuan lainnya...",
+    btnSave: "Simpan Catatan", btnSaved: "✓ Tersimpan!",
+    alertEmptyRecog: "⚠️ ETIKA: Anda perlu Action Plan tapi belum memilih/mengisi bentuk Pengakuan. Centang minimal satu.",
+    alertEmptyName: "Isi nama anggota tim untuk dokumentasi.",
+
+    aiBtn: "✨ Dapatkan AI Coaching",
+    aiLoading: "Menganalisis profil psikologis...",
+    aiTitle: "Rekomendasi AI Coach",
+    aiError: "Gagal terhubung ke AI. Cek koneksi internet dan coba lagi.",
+    aiDisclaimer: "AI coaching bersifat panduan tambahan, bukan pengganti penilaian profesional.",
+
+    historyTitle: "📋 Catatan Observasi",
+    noHistory: "Belum ada catatan.",
+    clearHistory: "Hapus semua",
+    trendTitle: "Tren Skor",
+    trendSelect: "Pilih nama untuk lihat tren:",
+    trendNoData: "Simpan minimal 2 catatan dengan nama yang sama untuk melihat tren.",
+    thName: "Nama", thDate: "Tgl", thMps: "MPS", thEng: "Keterlibatan", thBurn: "Burnout", thDiag: "Diag", thNewTask: "Tugas Baru", thRecog: "Pengakuan",
+    btnExport: "📁 Export JSON", btnImport: "📂 Import",
+
+    diagnoses: {
+      ideal: { title:"✅ Kondisi Ideal & Seimbang", color:"green",
+        desc:"Semua dimensi inti dalam kisaran sehat. Pertahankan ritme, berikan pengakuan berkala, dan pantau variasi agar karyawan tidak masuk fase jenuh diam-diam.",
+        research:"Hackman & Oldham (1976) – Motivation through the design of work. Organ. Behav. Hum. Perform., 16(2), 250–279.", link:"https://doi.org/10.1016/0030-5073(76)90016-7" },
+      severe_burnout: { title:"🚨 BAHAYA: Iso-Strain (Burnout Parah)", color:"red",
+        desc:"Kelebihan beban SEKALIGUS terisolasi sosial — kombinasi paling berbahaya dalam model Job Demands-Control-Support. Risiko kesehatan dan turnover sangat tinggi. Segera kurangi beban kerja minimal 20% dan jadwalkan 1-on-1 mingguan.",
+        research:"Karasek & Theorell (1990) – Healthy Work: Stress, Productivity & the Reconstruction of Working Life. Johnson & Hall (1988) – Job strain, work place social support, and CVD. AJPH, 78(10), 1336–1342.", link:"https://pubmed.ncbi.nlm.nih.gov/3395968/" },
+      psych_danger: { title:"🔴 Krisis Keamanan Psikologis", color:"red",
+        desc:"Keamanan psikologis rendah mematikan pembelajaran, inovasi, dan keterbukaan. Karyawan mungkin sudah lama menyimpan masalah kritis. Amy Edmondson (1999) membuktikan bahwa ini prediktor terkuat kinerja tim. Reaksi 'no-blame' atas kesalahan adalah intervensi pertama.",
+        research:"Edmondson, A.C. (1999) – Psychological safety and learning behavior in work teams. Admin. Sci. Quarterly, 44(2), 350–383.", link:"https://doi.org/10.2307/2666999" },
+      supported_strain: { title:"🛡️ High Strain, tapi Terlindungi", color:"amber",
+        desc:"Beban kerja tinggi, namun dukungan sosial yang kuat berfungsi sebagai buffer stres (efek 'iso-strain reversal'). Kondisi aman sementara — pantau agar tidak menjadi kronis. Jangan tambah tugas baru.",
+        research:"Johnson & Hall (1988) – Job strain, work place social support, and CVD. Am. J. Public Health, 78(10), 1336–1342.", link:"https://pubmed.ncbi.nlm.nih.gov/3395968/" },
+      role_ambiguity: { title:"⚠️ Krisis Kejelasan Peran", color:"amber",
+        desc:"Ambiguitas peran adalah stresor primer yang langsung menurunkan performa, kepuasan kerja, dan komitmen organisasi. Rizzo dkk. (1970) menunjukkan efeknya lebih besar dari konflik antarpersonal. Klarifikasi ekspektasi secara tertulis minggu ini.",
+        research:"Rizzo, House & Lirtzman (1970) – Role conflict and ambiguity in complex organizations. Admin. Sci. Quarterly, 15(2), 150–163.", link:"https://doi.org/10.2307/2391486" },
+      boreout: { title:"🥱 Risiko Boreout (Apatis Tersembunyi)", color:"amber",
+        desc:"Underchallenge yang kronis menghasilkan kebosanan kerja (boredom proneness) yang lebih merusak dari burnout karena tidak terlihat secara luar. Segera berikan proyek baru dengan tingkat kesulitan lebih tinggi atau rotasi lintas tim.",
+        research:"Kass, Vodanovich & Callender (2001) – State-trait boredom: Relationship to absenteeism, tenure, and job satisfaction. J. Bus. Psychol., 16(2), 317–327.", link:"https://doi.org/10.1023/A:1011121503118" },
+      feedback: { title:"🔄 Sistem Umpan Balik Perlu Diperbaiki", color:"indigo",
+        desc:"Tanpa umpan balik, karyawan tidak bisa mengkalibrasi usaha mereka — motivasi dan akurasi kerja menurun secara linier. Meta-analisis Kluger & DeNisi (1996) atas 607 penelitian membuktikan feedback sebagai intervensi kinerja paling efektif. Jadwalkan check-in mingguan.",
+        research:"Kluger & DeNisi (1996) – Effects of feedback interventions on performance. Psychol. Bull., 119(2), 254–284.", link:"https://doi.org/10.1037/0033-2909.119.2.254" },
+      growth_stagnation: { title:"📈 Stagnasi Pertumbuhan", color:"indigo",
+        desc:"Karyawan punya otonomi tapi tidak merasakan perkembangan kompetensi — kebutuhan 'competence' dalam Self-Determination Theory (Ryan & Deci) tidak terpenuhi. Ini memprediksi disengagement diam-diam meski performa terlihat stabil. Identifikasi stretch assignment atau mentoring.",
+        research:"Ryan & Deci (2000) – Self-determination theory and facilitation of intrinsic motivation. Am. Psychologist, 55(1), 68–78.", link:"https://doi.org/10.1037/0003-066X.55.1.68" },
+      enrichment: { title:"⬆️ Prioritas: Job Enrichment (Vertikal)", color:"indigo",
+        desc:"Karyawan butuh otonomi, makna, dan kontrol — bukan sekadar lebih banyak tugas. Berikan wewenang pengambilan keputusan dan tunjukkan dampak langsung pekerjaannya terhadap pelanggan atau tim sebelum menambah variasi.",
+        research:"Hackman & Oldham (1975) – Development of the Job Diagnostic Survey. J. Appl. Psychol., 60(2), 159–170.", link:"https://doi.org/10.1037/h0076546" },
+      enlargement: { title:"↔️ Prioritas: Job Enlargement (Horizontal)", color:"indigo",
+        desc:"Otonomi dan makna sudah cukup, tapi tugas mulai monoton dan menumpulkan skill. Tambah variasi tugas pada level kesulitan serupa atau libatkan dalam proyek lintas fungsi.",
+        research:"Herzberg (1968) – One More Time: How Do You Motivate Employees? Harvard Business Review.", link:"https://hbr.org/1968/01/one-more-time-how-do-you-motivate-employees" }
+    }
+  },
+  en: {
+    appTitle: "Leader's Compass", appVersion: "V3 • Invisible Assessment",
+    appSubtitle: "Casual Chat → Research-Based Diagnosis",
+    langToggle: "Bahasa Indonesia",
+    introText: "🔍 Designed for leaders during informal chats. Use 'camouflage' questions below to read team dynamics without triggering the Hawthorne Effect — no formal surveys, no social desirability bias.",
+    warningTitle: "📜 Ethical Leadership",
+    rule1: "This data is for leader reflection ONLY — not for formal appraisal or punishment.",
+    rule2: "If adding responsibilities, ALWAYS provide a form of recognition (KPI, praise, compensation).",
+    rule3: "Principle: 'Can do the work but not acknowledged' creates lasting workplace trauma.",
+    memberName: "Team Member Name",
+    namePlaceholder: "e.g., Sarah Chen",
+    sectionInput: "Observation Input",
+    labelJCM: "Job Characteristics Model (JCM)",
+    jcmDesc: "Five core dimensions that drive intrinsic motivation (Hackman & Oldham, 1976)",
+    labelJDR: "Job Demands-Resources Model (JD-R)",
+    jdrDesc: "Work context: demands, support, and psychological resources (Bakker & Demerouti, 2007)",
+    section1Desc: "Adjust sliders based on natural conversation. 1 = Low/Danger, 5 = Healthy/High.",
+
+    dimVariety: "Skill Variety", qVariety: "Any new challenges this week, or still the same routine?", lblVLow: "Monotonous", lblVHigh: "Highly varied",
+    dimAutonomy: "Autonomy", qAutonomy: "If you had full control of this project, what would you change?", lblALow: "Waits for orders", lblAHigh: "Independent",
+    dimIdentity: "Task Identity", qIdentity: "Can you picture the final outcome of your piece of work?", lblILow: "Just fragments", lblIHigh: "Whole process",
+    dimSignificance: "Task Significance", qSignificance: "Does your work directly impact other people or the team?", lblSLow: "No impact felt", lblSHigh: "High impact",
+    dimFeedback: "Feedback", qFeedback: "Do you feel 'in the dark' about whether your work meets standards?", lblFLow: "Guessing", lblFHigh: "Very clear",
+
+    dimWorkload: "Workload", qWorkload: "Current pace: still have breathing room, or actually under-challenged?", lblWLow: "Overwhelmed", lblWHigh: "Under-challenged",
+    dimSupport: "Social Support", qSupport: "When you're stuck, is it easy to find someone to discuss it with?", lblSupLow: "Isolated", lblSupHigh: "Highly supported",
+    dimRoleClarity: "Role Clarity", qRoleClarity: "If there were a surprise meeting about your role expectations, how ready are you to explain your priorities?", lblRCLow: "High ambiguity", lblRCHigh: "Crystal clear",
+    dimPsychSafety: "Psychological Safety", qPsychSafety: "If you had a different idea or disagreed with leadership, would you feel comfortable speaking up?", lblPSLow: "Fear of speaking up", lblPSHigh: "Totally free to speak",
+    dimGrowth: "Growth Opportunity", qGrowth: "Do you feel your skills and capabilities are actually developing in this role?", lblGLow: "Stagnant", lblGHigh: "Growing fast",
+
+    chartTitle: "10-Dimension Profile",
+    chartLabels: ["Variety","Autonomy","Identity","Significance","Feedback","Workload","Support","Role Clarity","Psych Safety","Growth"],
+
+    scoreTitle: "Score Dashboard",
+    mpsLabel: "MPS", mpsFormula: "(Variety+Identity+Significance)/3 × Autonomy × Feedback",
+    engLabel: "Engagement Index", engDesc: "Based on MPS, Growth, Psych Safety, Role Clarity",
+    burnLabel: "Burnout Risk", burnDesc: "Based on Workload Demand, Support, Psych Safety",
+    jdrLabel: "JD-R Balance",
+    jdrDemand: "High Demand", jdrResource: "Well Resourced",
+
+    diagTitle: "Diagnosis & Recommendations",
+    researchSource: "📚 Research source:",
+    secondaryFlags: "⚠️ Additional Flags:",
+
+    actionTitle: "Action Plan & Recognition",
+    newTaskLbl: "New Responsibility / Challenge (if any)",
+    recogLbl: "⭐ Mandatory: Recognition Commitment",
+    recogDesc: "Select the form of recognition for the added responsibility.",
+    chkKpi: "KPI / Target Adjustment", chkPublic: "Public Praise / Team Shout-out", chkBonus: "Bonus / Project Compensation", chkCareer: "Career Progression / Rotation",
+    notesLbl: "Additional Notes",
+    notesPlaceholder: "Important context, extra observations...",
+    recogOtherPlaceholder: "Other recognition notes...",
+    btnSave: "Save Note", btnSaved: "✓ Saved!",
+    alertEmptyRecog: "⚠️ ETHICS: Action Plan is needed but Recognition is empty. Check at least one commitment.",
+    alertEmptyName: "Please fill in the team member name for documentation.",
+
+    aiBtn: "✨ Get AI Coaching",
+    aiLoading: "Analyzing psychological profile...",
+    aiTitle: "AI Coach Recommendations",
+    aiError: "Could not connect to AI. Check your internet and try again.",
+    aiDisclaimer: "AI coaching is supplementary guidance, not a substitute for professional assessment.",
+
+    historyTitle: "📋 Observation Notes",
+    noHistory: "No notes yet.",
+    clearHistory: "Clear all",
+    trendTitle: "Score Trend",
+    trendSelect: "Select a name to view trend:",
+    trendNoData: "Save at least 2 notes with the same name to see a trend.",
+    thName: "Name", thDate: "Date", thMps: "MPS", thEng: "Eng.", thBurn: "Burn.", thDiag: "Diag", thNewTask: "New Task", thRecog: "Recognition",
+    btnExport: "📁 Export JSON", btnImport: "📂 Import",
+
+    diagnoses: {
+      ideal: { title:"✅ Ideal & Balanced Condition", color:"green",
+        desc:"All core dimensions are in the healthy range. Maintain the rhythm, provide periodic recognition, and monitor variety to prevent silent disengagement.",
+        research:"Hackman & Oldham (1976) – Motivation through the design of work. Organ. Behav. Hum. Perform., 16(2), 250–279.", link:"https://doi.org/10.1016/0030-5073(76)90016-7" },
+      severe_burnout: { title:"🚨 DANGER: Iso-Strain (Severe Burnout)", color:"red",
+        desc:"Overloaded AND socially isolated — the most dangerous combination in the Job Demands-Control-Support model. Very high health and turnover risk. Immediately reduce workload by at least 20% and schedule weekly 1-on-1s.",
+        research:"Karasek & Theorell (1990) – Healthy Work. Johnson & Hall (1988) – Job strain, work place social support, and CVD. AJPH, 78(10), 1336–1342.", link:"https://pubmed.ncbi.nlm.nih.gov/3395968/" },
+      psych_danger: { title:"🔴 Psychological Safety Crisis", color:"red",
+        desc:"Low psychological safety silences ideas, prevents learning, and accelerates turnover. The employee may have been holding back critical issues for a long time. Edmondson (1999) showed this is the strongest predictor of team performance. A no-blame reaction to mistakes is the first intervention.",
+        research:"Edmondson, A.C. (1999) – Psychological safety and learning behavior in work teams. Admin. Sci. Quarterly, 44(2), 350–383.", link:"https://doi.org/10.2307/2666999" },
+      supported_strain: { title:"🛡️ High Strain, but Buffered", color:"amber",
+        desc:"High workload, but strong social support acts as a stress buffer (iso-strain reversal effect). Temporarily safe — monitor carefully. Do not add new tasks.",
+        research:"Johnson & Hall (1988) – Job strain, work place social support, and CVD. Am. J. Public Health, 78(10), 1336–1342.", link:"https://pubmed.ncbi.nlm.nih.gov/3395968/" },
+      role_ambiguity: { title:"⚠️ Role Clarity Crisis", color:"amber",
+        desc:"Role ambiguity is a primary stressor that directly reduces performance, job satisfaction, and commitment. Rizzo et al. (1970) showed its impact exceeds interpersonal conflict. Clarify expectations in writing this week.",
+        research:"Rizzo, House & Lirtzman (1970) – Role conflict and ambiguity in complex organizations. Admin. Sci. Quarterly, 15(2), 150–163.", link:"https://doi.org/10.2307/2391486" },
+      boreout: { title:"🥱 Boreout Risk (Hidden Apathy)", color:"amber",
+        desc:"Chronic underchallenge produces boredom proneness that is more destructive than burnout because it's invisible from the outside. Immediately provide a new project with higher difficulty or cross-team rotation.",
+        research:"Kass, Vodanovich & Callender (2001) – State-trait boredom: Relationship to absenteeism, tenure, and job satisfaction. J. Bus. Psychol., 16(2), 317–327.", link:"https://doi.org/10.1023/A:1011121503118" },
+      feedback: { title:"🔄 Feedback System Needs Fixing", color:"indigo",
+        desc:"Without feedback, employees can't calibrate their effort — motivation and accuracy decline linearly. Kluger & DeNisi's (1996) meta-analysis of 607 studies proves feedback is the most effective performance intervention. Schedule weekly check-ins.",
+        research:"Kluger & DeNisi (1996) – Effects of feedback interventions on performance. Psychol. Bull., 119(2), 254–284.", link:"https://doi.org/10.1037/0033-2909.119.2.254" },
+      growth_stagnation: { title:"📈 Growth Stagnation", color:"indigo",
+        desc:"The employee has autonomy but doesn't feel their competence growing — the 'competence' need in Self-Determination Theory is unmet. This predicts silent disengagement even when visible performance seems stable. Identify stretch assignments or mentoring.",
+        research:"Ryan & Deci (2000) – Self-determination theory and facilitation of intrinsic motivation. Am. Psychologist, 55(1), 68–78.", link:"https://doi.org/10.1037/0003-066X.55.1.68" },
+      enrichment: { title:"⬆️ Priority: Job Enrichment (Vertical)", color:"indigo",
+        desc:"The employee needs autonomy, meaning, and control — not just more tasks. Grant decision-making authority and demonstrate the direct impact of their work before adding variety.",
+        research:"Hackman & Oldham (1975) – Development of the Job Diagnostic Survey. J. Appl. Psychol., 60(2), 159–170.", link:"https://doi.org/10.1037/h0076546" },
+      enlargement: { title:"↔️ Priority: Job Enlargement (Horizontal)", color:"indigo",
+        desc:"Autonomy and meaning are sufficient, but tasks are becoming monotonous and dulling skills. Add task variety at a similar difficulty level or involve them in cross-functional projects.",
+        research:"Herzberg (1968) – One More Time: How Do You Motivate Employees? Harvard Business Review.", link:"https://hbr.org/1968/01/one-more-time-how-do-you-motivate-employees" }
+    }
+  }
+};
+
+/* ───────────────────────── HELPER COMPONENTS ───────────────────────── */
+const WarningIcon = () => <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
+const CheckIcon = () => <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const SparkleIcon = () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>;
+
+/* Fungsi untuk merender teks AI menjadi HTML cantik */
+const renderMarkdown = (text) => {
+  if (!text) return null;
+  return text.split('\n').map((line, index) => {
+    let content = line.trim();
+    let isBullet = content.startsWith('* ') || content.startsWith('- ') || content.startsWith('• ');
+    
+    if (isBullet) content = content.substring(2);
+    if (content === '') return <div key={index} className="h-2"></div>;
+
+    // Pisahkan text yang bold (mengandung **)
+    const parts = content.split(/(\*\*.*?\*\*)/g).map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="font-extrabold text-indigo-900">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+
+    // Desain untuk bullet points
+    if (isBullet) {
+      return (
+        <div key={index} className="flex items-start gap-2 mb-1.5 ml-1">
+          <span className="text-indigo-500 font-bold mt-0.5">•</span>
+          <span className="text-slate-700">{parts}</span>
+        </div>
+      );
+    }
+
+    // Desain untuk paragraf biasa
+    return <p key={index} className="mb-2 text-slate-700">{parts}</p>;
+  });
+};
+
+/* Radar chart (10 dimensions) */
+const RadarChart = ({ data, labels }) => {
+  const ref = useRef(null); const inst = useRef(null);
+  useEffect(() => {
+    if (inst.current) inst.current.destroy();
+    const ctx = ref.current.getContext('2d');
+    inst.current = new Chart(ctx, {
+      type:'radar',
+      data:{
+        labels,
+        datasets:[{
+          label:'Score',
+          data,
+          backgroundColor:'rgba(99,102,241,0.12)',
+          borderColor:'rgba(99,102,241,0.85)',
+          pointBackgroundColor:'rgba(99,102,241,1)',
+          pointBorderColor:'#fff',
+          pointRadius:3,
+          borderWidth:2
+        }]
+      },
+      options:{
+        scales:{r:{min:0,max:5,ticks:{stepSize:1,display:false,backdropColor:'transparent'},
+          pointLabels:{font:{size:9,family:'Plus Jakarta Sans'},color:'#4b5563'},
+          grid:{color:'rgba(0,0,0,0.06)'},angleLines:{color:'rgba(0,0,0,0.06)'}}},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.parsed.r}/5`}}},
+        maintainAspectRatio:false
+      }
+    });
+    return () => { if(inst.current) inst.current.destroy(); };
+  }, [data, labels]);
+  return <div className="h-52 w-full"><canvas ref={ref}></canvas></div>;
+};
+
+/* Trend line chart */
+const TrendChart = ({ entries, lang }) => {
+  const ref = useRef(null); const inst = useRef(null);
+  const t = T[lang];
+  useEffect(() => {
+    if (!entries || entries.length < 2) return;
+    if (inst.current) inst.current.destroy();
+    const ctx = ref.current.getContext('2d');
+    const labels = entries.map(e => e.date.split(',')[0]);
+    const mpsData = entries.map(e => e.mps || 0);
+    const engData = entries.map(e => e.engagementIndex || 0);
+    const burnData = entries.map(e => e.burnoutRisk || 0);
+    inst.current = new Chart(ctx, {
+      type:'line',
+      data:{
+        labels,
+        datasets:[
+          {label:'MPS',data:mpsData,borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,0.08)',tension:0.4,fill:true,yAxisID:'y'},
+          {label: t.engLabel,data:engData,borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.0)',tension:0.4,fill:false,yAxisID:'y2'},
+          {label: t.burnLabel,data:burnData,borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,0.0)',tension:0.4,fill:false,yAxisID:'y2'}
+        ]
+      },
+      options:{
+        scales:{
+          y:{min:0,max:125,title:{display:true,text:'MPS',font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'}},
+          y2:{min:0,max:100,position:'right',title:{display:true,text:'Index (0-100)',font:{size:10}},grid:{display:false}}
+        },
+        plugins:{legend:{labels:{font:{family:'Plus Jakarta Sans',size:10},boxWidth:12}}},
+        maintainAspectRatio:false
+      }
+    });
+    return () => { if(inst.current) inst.current.destroy(); };
+  }, [entries]);
+  if (!entries || entries.length < 2) return <p className="text-center text-slate-400 text-sm py-6">{t.trendNoData}</p>;
+  return <div className="h-52"><canvas ref={ref}></canvas></div>;
+};
+
+/* Score bar */
+const ScoreBar = ({ value, max, color, label, sublabel }) => {
+  const pct = Math.min(100, Math.round((value/max)*100));
+  const colorMap = { indigo:'bg-indigo-500', green:'bg-emerald-500', red:'bg-rose-500', amber:'bg-amber-500' };
+  const bgMap   = { indigo:'bg-indigo-100', green:'bg-emerald-100', red:'bg-rose-100', amber:'bg-amber-100' };
+  const textMap = { indigo:'text-indigo-700', green:'text-emerald-700', red:'text-rose-600', amber:'text-amber-700' };
+  return (
+    <div>
+      <div className="flex justify-between items-baseline mb-1">
+        <span className="text-xs font-semibold text-slate-700">{label}</span>
+        <span className={`mono text-sm font-bold ${textMap[color]}`}>{Math.round(value)}<span className="text-[10px] font-normal text-slate-400">/{max}</span></span>
+      </div>
+      <div className={`h-2 rounded-full ${bgMap[color]} overflow-hidden`}>
+        <div className={`h-full rounded-full score-fill ${colorMap[color]}`} style={{width:`${pct}%`}}></div>
+      </div>
+      {sublabel && <p className="text-[10px] text-slate-400 mt-0.5">{sublabel}</p>}
+    </div>
+  );
+};
+
+/* JD-R Balance bar */
+const JDRBar = ({ balance, t }) => {
+  const pct = Math.min(100, Math.max(0, ((balance+4)/8)*100));
+  const isHealthy = balance >= 0;
+  return (
+    <div>
+      <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+        <span className="text-rose-500 font-medium">← {t.jdrDemand}</span>
+        <span className="text-emerald-600 font-medium">{t.jdrResource} →</span>
+      </div>
+      <div className="relative h-3 rounded-full jdr-gradient overflow-hidden border border-slate-200">
+        <div className="absolute top-0 bottom-0 w-0.5 bg-slate-400/60" style={{left:'50%'}}></div>
+        <div className={`absolute top-0.5 bottom-0.5 w-2.5 rounded-full ${isHealthy ? 'bg-emerald-500' : 'bg-rose-500'} shadow`} style={{left:`calc(${pct}% - 6px)`,transition:'left 0.5s ease'}}></div>
+      </div>
+      <div className="text-center mt-1">
+        <span className={`mono text-[11px] font-bold ${isHealthy ? 'text-emerald-600' : 'text-rose-500'}`}>{balance > 0 ? '+' : ''}{balance.toFixed(1)}</span>
+        <span className="text-[10px] text-slate-400 ml-1">({isHealthy ? (t.jdrResource) : (t.jdrDemand)})</span>
+      </div>
+    </div>
+  );
+};
+
+/* Dynamic slider component */
+function DimSlider({ label, question, low, high, val, setVal, type = 'default' }) {
+  const getContainerClass = () => {
+    if (type === 'workload') {
+      if (val <= 2) return 'sval-bad';
+      if (val === 3) return 'sval-ok';
+      return 'sval-amber';
+    }
+    if (val <= 2) return 'sval-bad';
+    if (val >= 4) return 'sval-good';
+    return 'sval-ok';
+  };
+  const getSliderClass = () => {
+    if (type === 'workload') { return val <= 2 ? 'slider slider-red' : val >= 4 ? 'slider slider-amber' : 'slider'; }
+    if (val <= 2) return 'slider slider-red';
+    if (val >= 4) return 'slider slider-green';
+    return 'slider';
+  };
+  const getDotColor = () => {
+    if (type === 'workload') { if (val<=2) return '#ef4444'; if (val>=4) return '#f59e0b'; return '#6366f1'; }
+    if (val <= 2) return '#ef4444'; if (val >= 4) return '#10b981'; return '#6366f1';
+  };
+  return (
+    <div className={`slider-container border rounded-xl p-3 ${getContainerClass()}`}>
+      <div className="flex justify-between items-center mb-0.5">
+        <span className="font-semibold text-sm text-slate-800">{label}</span>
+        <span className="mono font-bold text-sm px-1.5 py-0 rounded-md" style={{color:getDotColor(),background:`${getDotColor()}18`}}>{val}/5</span>
+      </div>
+      <p className="text-[11px] text-slate-500 italic mb-2 leading-snug">"{question}"</p>
+      <input type="range" min="1" max="5" step="1" value={val} onChange={e => setVal(parseInt(e.target.value))} className={getSliderClass()} />
+      <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+        <span>{low}</span><span>{high}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────── MAIN APP ───────────────────────── */
+function App() {
+  const [lang, setLang] = useState('id');
+  const t = T[lang];
+
+  // Sliders: JCM core
+  const [variety, setVariety] = useState(3);
+  const [autonomy, setAutonomy] = useState(3);
+  const [identity, setIdentity] = useState(3);
+  const [significance, setSignificance] = useState(3);
+  const [feedback, setFeedback] = useState(3);
+  // Sliders: JD-R
+  const [workload, setWorkload] = useState(3);
+  const [support, setSupport] = useState(3);
+  const [roleClarity, setRoleClarity] = useState(3);
+  const [psychSafety, setPsychSafety] = useState(3);
+  const [growth, setGrowth] = useState(3);
+
+  // Form state
+  const [name, setName] = useState('');
+  const [newTask, setNewTask] = useState('');
+  const [notes, setNotes] = useState('');
+  const [recog, setRecog] = useState({ kpi:false, public:false, bonus:false, career:false });
+  const [recogOther, setRecogOther] = useState('');
+  const [savedNotify, setSavedNotify] = useState(false);
+
+  // AI coaching
+  const [aiState, setAiState] = useState('idle'); // idle|loading|done|error
+  const [aiText, setAiText] = useState('');
+
+ // History & trend
+  const [history, setHistory] = useState([]);
+  const [trendName, setTrendName] = useState('');
+  const fileRef = useRef(null);
+
+  // State untuk baris tabel yang sedang dibuka (dropdown AI)
+  const [expandedRow, setExpandedRow] = useState(null);
+
+  // --- KODE BARU ANDA MULAI DI SINI ---
+  // State baru untuk Gemini API Key
+  const [apiKey, setApiKey] = useState('');
+
+  useEffect(() => {
+    // Load history
+    const stored = localStorage.getItem('lc_v3');
+    if (stored) try { setHistory(JSON.parse(stored)); } catch(e){}
+    
+    // Load API Key jika sebelumnya sudah pernah dimasukkan
+    const storedKey = localStorage.getItem('lc_v3_gemini_key');
+    if (storedKey) setApiKey(storedKey);
+  }, []);
+
+  // Fungsi khusus untuk menyimpan key ke state dan local storage
+  const handleKeyChange = (e) => {
+    const val = e.target.value;
+    setApiKey(val);
+    localStorage.setItem('lc_v3_gemini_key', val);
+  };
+
+  const saveHistory = h => { localStorage.setItem('lc_v3', JSON.stringify(h)); setHistory(h); };
+
+  /* ── COMPUTED SCORES ── */
+  const coreAvg = (variety + identity + significance) / 3;
+  const mps = parseFloat((coreAvg * autonomy * feedback).toFixed(1)); // 0–125
+
+  // JD-R: workload demand (U-shaped: both extremes = high demand)
+  const workloadDemand = workload <= 3 ? (6 - workload) : (workload - 1);
+  // resources avg (six dimensions)
+  const resourcesAvg = (autonomy + support + feedback + roleClarity + psychSafety + growth) / 6;
+  const jdrBalance = parseFloat((resourcesAvg - workloadDemand).toFixed(2));
+
+  // Engagement index 0–100 (Schaufeli et al., 2002 – UWES approximation)
+  const engagementIndex = Math.round(
+    (mps/125) * 35 +
+    (growth/5) * 25 +
+    (psychSafety/5) * 22 +
+    (roleClarity/5) * 18
+  );
+
+  // Burnout risk 0–100 (Maslach Burnout Inventory dimensions approximation)
+  const burnoutRisk = Math.round(
+    (workloadDemand/5) * 40 +
+    ((5-support)/5) * 30 +
+    ((5-psychSafety)/5) * 30
+  );
+
+  /* ── DIAGNOSIS ── */
+  let activeDiagnosis = 'ideal';
+  if      (workload<=2 && support<=2)          activeDiagnosis = 'severe_burnout';
+  else if (psychSafety<=2)                     activeDiagnosis = 'psych_danger';
+  else if (workload<=2)                        activeDiagnosis = 'supported_strain';
+  else if (roleClarity<=2)                     activeDiagnosis = 'role_ambiguity';
+  else if (workload>=4 && variety<=2 && mps<30)activeDiagnosis = 'boreout';
+  else if (feedback<=2)                        activeDiagnosis = 'feedback';
+  else if (growth<=2 && autonomy>=3)           activeDiagnosis = 'growth_stagnation';
+  else if (autonomy<=2||identity<=2||significance<=2) activeDiagnosis = 'enrichment';
+  else if (variety<=2)                         activeDiagnosis = 'enlargement';
+
+  // Secondary flags (additional warnings even if not primary)
+  const secondaryFlags = [];
+  if (activeDiagnosis !== 'psych_danger'    && psychSafety <= 2) secondaryFlags.push('⚠️ Psych Safety rendah');
+  if (activeDiagnosis !== 'role_ambiguity'  && roleClarity <= 2) secondaryFlags.push('⚠️ Role ambiguity tinggi');
+  if (activeDiagnosis !== 'feedback'        && feedback <= 2)    secondaryFlags.push('⚠️ Feedback minim');
+  if (activeDiagnosis !== 'growth_stagnation'&&growth <= 2)      secondaryFlags.push('⚠️ Growth stagnan');
+
+  const requiresActionPlan = activeDiagnosis !== 'ideal';
+
+  const diagInfo = t.diagnoses[activeDiagnosis];
+  const diagColorMap = { red:'diag-red', amber:'diag-amber', indigo:'diag-indigo', green:'diag-green', rose:'diag-rose' };
+  const diagClass = diagColorMap[diagInfo?.color] || 'diag-indigo';
+
+  /* ── LOAD SAMPLE DATA ── */
+  const loadSampleJohnSmith = () => {
+    setName('John Smith');
+    // JCM: Otonomi dan Identitas dibuat rendah untuk memicu Job Enrichment
+    setVariety(4);
+    setAutonomy(2);
+    setIdentity(2);
+    setSignificance(3);
+    setFeedback(3);
+    
+    // JD-R: Kondisi kerja dan mental dibuat aman/stabil
+    setWorkload(3); 
+    setSupport(4);
+    setRoleClarity(4);
+    setPsychSafety(4);
+    setGrowth(3);
+  };
+
+  /* ── SAVE ── */
+  const handleSave = () => {
+    if (!name.trim()) { alert(t.alertEmptyName); return; }
+    const hasRecog = Object.values(recog).some(v=>v) || recogOther.trim();
+    if (requiresActionPlan && !hasRecog) { alert(t.alertEmptyRecog); return; }
+    const recogTags = [];
+    if (recog.kpi) recogTags.push('KPI');
+    if (recog.public) recogTags.push('Praise');
+    if (recog.bonus) recogTags.push('Bonus');
+    if (recog.career) recogTags.push('Career');
+    const recogStr = (recogTags.length ? '['+recogTags.join(', ')+'] ' : '') + recogOther.trim();
+
+    const entry = {
+      id:Date.now(), name:name.trim(), date:new Date().toLocaleString(),
+      variety,autonomy,identity,significance,feedback,workload,support,roleClarity,psychSafety,growth,
+      mps, engagementIndex, burnoutRisk, jdrBalance,
+      newTask:newTask.trim(), recognition:recogStr.trim(), notes:notes.trim(),
+      diagnosis:activeDiagnosis,
+      aiAnalysis: aiText
+    };
+
+    const updated = [entry, ...history];
+    saveHistory(updated);
+    setSavedNotify(true);
+    setNewTask(''); setRecogOther(''); setNotes('');
+    setRecog({kpi:false,public:false,bonus:false,career:false});
+    setTimeout(()=>setSavedNotify(false), 2500);
+  };
+
+/* ── AI COACHING (GEMINI BYOK) ── */
+  const handleAiCoaching = async () => {
+    if (!name.trim()) { alert(t.alertEmptyName); return; }
+    if (!apiKey.trim()) { alert(lang === 'id' ? '⚠️ Masukkan Gemini API Key di pojok kanan atas terlebih dahulu!' : '⚠️ Please enter your Gemini API Key at the top right!'); return; }
+    
+    setAiState('loading'); setAiText('');
+    const langLabel = lang === 'id' ? 'Indonesian (Bahasa Indonesia)' : 'English';
+    const prompt = `You are an expert organizational psychologist and leadership coach.
+                    Analyze this team member assessment and give specific, practical coaching recommendations.
+
+                    Team Member: ${name}
+                    Language for your response: ${langLabel}
+
+                    JOB CHARACTERISTICS MODEL (JCM — Hackman & Oldham, 1976):
+                    - Skill Variety: ${variety}/5
+                    - Task Identity: ${identity}/5
+                    - Task Significance: ${significance}/5
+                    - Autonomy: ${autonomy}/5
+                    - Feedback: ${feedback}/5
+                    - MPS (Motivating Potential Score): ${mps}/125
+
+                    JOB DEMANDS-RESOURCES (JD-R — Bakker & Demerouti, 2007):
+                    - Workload: ${workload}/5 (1=Overwhelmed, 3=Balanced, 5=Under-challenged)
+                    - Social Support: ${support}/5
+                    - Role Clarity: ${roleClarity}/5
+                    - Psychological Safety: ${psychSafety}/5
+                    - Growth Opportunity: ${growth}/5
+
+                    COMPOSITE SCORES:
+                    - Engagement Index: ${engagementIndex}/100
+                    - Burnout Risk: ${burnoutRisk}/100
+                    - JD-R Balance: ${jdrBalance} (positive=more resources, negative=more demands)
+                    - Primary Diagnosis: ${activeDiagnosis}
+
+                    Respond in ${langLabel} with exactly this structure:
+                    **Insight Utama / Key Insight** (2-3 sentences: name the core psychological dynamic at play)
+
+                    **Tindakan Minggu Ini / This Week**
+                    • [specific action 1]
+                    • [specific action 2]
+                    • [specific action 3]
+
+                    **Rencana 30 Hari / 30-Day Plan** (2-3 sentences: medium-term development focus)
+
+                    Be specific to the EXACT scores. Reference the relevant model (JCM, JD-R, SDT, etc.) by name only — no citations needed. Keep it under 250 words. Be warm but direct.`;
+
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error?.message || 'Failed to connect to Gemini');
+      }
+
+      // Parsing struktur response Gemini
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      if (text) { setAiText(text); setAiState('done'); }
+      else { setAiState('error'); }
+    } catch(e) { 
+      console.error(e);
+      setAiState('error'); 
+    }
+  };
+
+  /* ── HISTORY UTILS ── */
+  const clearHistory = () => {
+    if (confirm(lang==='id'?'Hapus semua catatan?':'Delete all notes?')) saveHistory([]);
+  };
+
+  const exportExcel = () => {
+    if (history.length === 0) {
+      alert(lang === 'id' ? 'Tidak ada data untuk diekspor' : 'No data to export');
+      return;
+    }
+
+    // Fungsi untuk mengamankan teks HTML dan merubah Enter menjadi <br> untuk Excel
+    const escapeHTML = (str) => {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br style="mso-data-placement:same-cell;" />'); // mso-data-placement memaksa enter di dalam sel yang sama
+    };
+
+    // Merakit struktur HTML spesifik untuk dibaca Excel
+    let tableHTML = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <style>
+          th { background-color: #4f46e5; color: white; font-weight: bold; text-align: left; vertical-align: top; border: 1px solid #cbd5e1; padding: 5px; }
+          td { vertical-align: top; border: 1px solid #cbd5e1; padding: 5px; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Name</th><th>MPS</th><th>Engagement Index</th><th>Burnout Risk</th>
+              <th>Diagnosis</th><th>New Task</th><th>Recognition</th><th>Notes</th><th>AI Analysis</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    // Looping data history untuk dimasukkan ke baris tabel
+    history.forEach(row => {
+      tableHTML += `
+        <tr>
+          <td>${escapeHTML(row.date)}</td>
+          <td>${escapeHTML(row.name)}</td>
+          <td>${row.mps}</td>
+          <td>${row.engagementIndex || ''}</td>
+          <td>${row.burnoutRisk || ''}</td>
+          <td>${escapeHTML(t.diagnoses[row.diagnosis]?.title || row.diagnosis)}</td>
+          <td>${escapeHTML(row.newTask)}</td>
+          <td>${escapeHTML(row.recognition)}</td>
+          <td>${escapeHTML(row.notes)}</td>
+          <td>${escapeHTML(row.aiAnalysis || 'Belum ada analisis AI')}</td>
+        </tr>
+      `;
+    });
+
+    tableHTML += `</tbody></table></body></html>`;
+
+    // Proses download file .xls
+    const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Leaders_Compass_Export_${Date.now()}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportJSON = () => {
+    const blob = new Blob([JSON.stringify({version:'3.0',exportDate:new Date().toISOString(),history},null,2)],{type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `leaders_compass_v3_${Date.now()}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+  const importJSON = e => {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.history) throw new Error();
+        saveHistory(Array.isArray(data.history)?data.history:[]);
+        alert(lang==='id'?'Data berhasil dimuat!':'Data loaded!');
+      } catch { alert(lang==='id'?'File JSON tidak valid':'Invalid JSON file'); }
+      if(fileRef.current) fileRef.current.value='';
+    };
+    reader.readAsText(file);
+  };
+
+  const diagEmoji = d => ({ideal:'✅',severe_burnout:'🚨',psych_danger:'🔴',supported_strain:'🛡️',role_ambiguity:'⚠️',boreout:'🥱',feedback:'🔄',growth_stagnation:'📈',enrichment:'⬆️',enlargement:'↔️'})[d]||'—';
+
+  // Unique names in history for trend selector
+  const uniqueNames = [...new Set(history.map(e=>e.name))];
+  const trendEntries = trendName ? history.filter(e=>e.name===trendName).slice().reverse() : [];
+
+  const radarData = [variety,autonomy,identity,significance,feedback,workload,support,roleClarity,psychSafety,growth];
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-6 md:py-8">
+
+{/* ── HEADER ── */}
+      <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">{t.appTitle}</h1>
+          <p className="text-xs font-semibold text-indigo-500 tracking-wider uppercase mt-0.5">{t.appVersion}</p>
+          <p className="text-sm text-slate-500 mt-0.5">{t.appSubtitle}</p>
+        </div>
+        <div className="flex flex-col gap-2 items-end">
+          <div className="flex flex-wrap gap-2 items-center">
+            <button onClick={exportJSON} className="bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-indigo-50 shadow-sm">{t.btnExport}</button>
+            <button onClick={()=>fileRef.current.click()} className="bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-indigo-50 shadow-sm">{t.btnImport}</button>
+            <input type="file" ref={fileRef} accept=".json" onChange={importJSON} style={{display:'none'}} />
+            <button onClick={()=>setLang(l=>l==='id'?'en':'id')} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-4 py-1.5 text-xs font-bold shadow-sm">{t.langToggle}</button>
+          </div>
+          {/* Form Input BYOK Gemini */}
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-full px-3 py-1.5 shadow-sm mt-1">
+            <span className="text-[10px] font-bold text-slate-500">🔑 GEMINI KEY:</span>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={handleKeyChange}
+              placeholder="Paste API Key..."
+              className="text-xs outline-none bg-transparent w-32 focus:w-48 transition-all duration-300 text-slate-700"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── INTRO BANNER ── */}
+      <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-4 text-sm text-indigo-800">{t.introText}</div>
+
+      {/* ── ETHICS WARNING ── */}
+      <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-8 rounded-r-xl">
+        <div className="flex gap-2 items-start"><WarningIcon/><div>
+          <p className="font-bold text-amber-900 text-sm">{t.warningTitle}</p>
+          <ul className="mt-1 space-y-0.5 text-xs text-amber-800 list-disc pl-4">
+            <li>{t.rule1}</li><li>{t.rule2}</li><li>{t.rule3}</li>
+          </ul>
+        </div></div>
+      </div>
+
+      {/* ── MAIN GRID ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+        {/* ── LEFT: INPUT PANEL ── */}
+        <div className="lg:col-span-2 space-y-5">
+
+
+            {/* Name & Sample Data */}
+          <div className="glass p-5">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-base font-bold text-slate-800">{t.sectionInput}</h2>
+              <button onClick={loadSampleJohnSmith} className="flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-full hover:bg-indigo-100 hover:scale-105 transition-all shadow-sm">
+                <SparkleIcon /> Load Sample: John Smith
+              </button>
+            </div>
+            
+            <label className="text-sm font-semibold text-slate-700 block mb-1">{t.memberName}</label>
+            <input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder={t.namePlaceholder}
+              className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            <p className="text-[11px] text-slate-400 mt-2 italic">*Klik tombol Load Sample di atas untuk melihat contoh kasus karyawan yang membutuhkan Job Enrichment.</p>
+          </div>
+
+          {/* JCM Section */}
+          <div className="glass p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="badge-jcm">{t.labelJCM}</span>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">{t.jcmDesc}<br/><span className="text-slate-400">{t.section1Desc}</span></p>
+            <div className="grid md:grid-cols-2 gap-3">
+              <DimSlider label={t.dimVariety}     question={t.qVariety}     low={t.lblVLow}   high={t.lblVHigh}   val={variety}      setVal={setVariety} />
+              <DimSlider label={t.dimAutonomy}    question={t.qAutonomy}    low={t.lblALow}   high={t.lblAHigh}   val={autonomy}     setVal={setAutonomy} />
+              <DimSlider label={t.dimIdentity}    question={t.qIdentity}    low={t.lblILow}   high={t.lblIHigh}   val={identity}     setVal={setIdentity} />
+              <DimSlider label={t.dimSignificance}question={t.qSignificance}low={t.lblSLow}   high={t.lblSHigh}   val={significance} setVal={setSignificance} />
+              <div className="md:col-span-2">
+                <DimSlider label={t.dimFeedback}  question={t.qFeedback}    low={t.lblFLow}   high={t.lblFHigh}   val={feedback}     setVal={setFeedback} />
+              </div>
+            </div>
+          </div>
+
+          {/* JD-R Section */}
+          <div className="glass p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="badge-jdr">{t.labelJDR}</span>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">{t.jdrDesc}</p>
+            <div className="grid md:grid-cols-2 gap-3">
+              <DimSlider label={t.dimWorkload}    question={t.qWorkload}    low={t.lblWLow}   high={t.lblWHigh}   val={workload}     setVal={setWorkload}   type="workload" />
+              <DimSlider label={t.dimSupport}     question={t.qSupport}     low={t.lblSupLow} high={t.lblSupHigh} val={support}      setVal={setSupport} />
+              <DimSlider label={t.dimRoleClarity} question={t.qRoleClarity} low={t.lblRCLow}  high={t.lblRCHigh}  val={roleClarity}  setVal={setRoleClarity} />
+              <DimSlider label={t.dimPsychSafety} question={t.qPsychSafety} low={t.lblPSLow}  high={t.lblPSHigh}  val={psychSafety}  setVal={setPsychSafety} />
+              <div className="md:col-span-2">
+                <DimSlider label={t.dimGrowth}    question={t.qGrowth}      low={t.lblGLow}   high={t.lblGHigh}   val={growth}       setVal={setGrowth} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── RIGHT: DASHBOARD ── */}
+        <div className="space-y-5">
+
+          {/* Score Dashboard */}
+          <div className="glass-hi p-5">
+            <h2 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">{t.scoreTitle}</h2>
+
+            {/* Radar */}
+            <div className="bg-slate-50/80 rounded-xl p-3 mb-4 border border-slate-100">
+              <p className="text-[11px] font-semibold text-center text-slate-500 mb-1 uppercase tracking-wider">{t.chartTitle}</p>
+              <RadarChart data={radarData} labels={t.chartLabels} />
+            </div>
+
+            {/* Score bars */}
+            <div className="space-y-3">
+              <ScoreBar value={mps} max={125} color="indigo" label={t.mpsLabel} sublabel={t.mpsFormula} />
+              <ScoreBar value={engagementIndex} max={100} color="green" label={t.engLabel} sublabel={t.engDesc} />
+              <ScoreBar value={burnoutRisk} max={100} color="red" label={t.burnLabel} sublabel={t.burnDesc} />
+            </div>
+
+            {/* JD-R Balance */}
+            <div className="mt-4 pt-3 border-t border-slate-100">
+              <p className="text-xs font-semibold text-slate-600 mb-2">{t.jdrLabel}</p>
+              <JDRBar balance={jdrBalance} t={t} />
+            </div>
+          </div>
+
+          {/* Diagnosis */}
+          <div className="glass p-5">
+            <h2 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 mb-3">{t.diagTitle}</h2>
+
+            {diagInfo && (
+              <div className={`${diagClass} p-3 rounded-r-xl mb-3 fade-in`}>
+                <p className="font-bold text-slate-800 text-sm">{diagInfo.title}</p>
+                <p className="text-[13px] text-slate-600 mt-1 leading-relaxed">{diagInfo.desc}</p>
+                <div className="mt-3 pt-2 border-t border-slate-200/60">
+                  <p className="text-[11px] font-bold text-indigo-600">{t.researchSource}</p>
+                  <a href={diagInfo.link} target="_blank" rel="noopener noreferrer"
+                    className="rlink block text-[11px] text-indigo-600 hover:text-indigo-800 mt-1 bg-white/60 p-2 rounded leading-relaxed break-words">{diagInfo.research}</a>
+                </div>
+              </div>
+            )}
+
+            {/* Secondary flags */}
+            {secondaryFlags.length > 0 && (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-2.5 mb-3">
+                <p className="text-[11px] font-bold text-amber-700 mb-1">{t.secondaryFlags}</p>
+                <div className="flex flex-wrap gap-1">
+                  {secondaryFlags.map((f,i) => <span key={i} className="text-[10px] bg-amber-100 text-amber-800 rounded-full px-2 py-0.5 font-medium">{f}</span>)}
+                </div>
+              </div>
+            )}
+
+            {/* AI Coaching Button */}
+            <button onClick={handleAiCoaching} disabled={aiState==='loading'}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-sm font-semibold py-2.5 rounded-xl shadow-md disabled:opacity-60">
+              {aiState==='loading' ? <><span className="pulse-dot"><span/><span/><span/></span><span>{t.aiLoading}</span></> : <><SparkleIcon/>{t.aiBtn}</>}
+            </button>
+
+            {/* AI Panel */}
+            {aiState==='done' && aiText && (
+              <div className="ai-gradient rounded-xl p-4 mt-3 fade-in">
+                <p className="text-xs font-bold text-indigo-700 mb-2 flex items-center gap-1"><SparkleIcon/>{t.aiTitle}</p>
+                <div className="text-[13px] leading-relaxed">{renderMarkdown(aiText)}</div>
+                <p className="text-[10px] text-slate-400 mt-3 pt-2 border-t border-indigo-100">{t.aiDisclaimer}</p>
+              </div>
+            )}
+            {aiState==='error' && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-3 text-sm text-red-700">{t.aiError}</div>
+            )}
+          </div>
+
+          {/* Action Plan */}
+          {requiresActionPlan && (
+            <div className="glass border-2 border-indigo-100 p-5">
+              <h2 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 mb-3">{t.actionTitle}</h2>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t.newTaskLbl}</label>
+                  <textarea rows="2" value={newTask} onChange={e=>setNewTask(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-none" />
+                </div>
+                <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3">
+                  <p className="text-xs font-bold text-indigo-900 mb-0.5">{t.recogLbl}</p>
+                  <p className="text-[11px] text-indigo-600 mb-2">{t.recogDesc}</p>
+                  <div className="grid grid-cols-2 gap-1.5 mb-2">
+                    {[['kpi',t.chkKpi],['public',t.chkPublic],['bonus',t.chkBonus],['career',t.chkCareer]].map(([k,label])=>(
+                      <label key={k} className="flex items-center gap-1.5 text-xs font-medium text-slate-700 cursor-pointer">
+                        <input type="checkbox" name={k} checked={recog[k]} onChange={e=>setRecog({...recog,[k]:e.target.checked})}
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-400 cursor-pointer"/>
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                  <input type="text" value={recogOther} onChange={e=>setRecogOther(e.target.value)} placeholder={t.recogOtherPlaceholder}
+                    className="w-full border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">{t.notesLbl}</label>
+                  <textarea rows="2" value={notes} onChange={e=>setNotes(e.target.value)} placeholder={t.notesPlaceholder}
+                    className="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-none" />
+                </div>
+                <button onClick={handleSave} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2">
+                  {savedNotify ? <><CheckIcon/>{t.btnSaved}</> : t.btnSave}
+                </button>
+              </div>
+            </div>
+          )}
+          {!requiresActionPlan && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">{t.notesLbl}</label>
+                <textarea rows="2" value={notes} onChange={e=>setNotes(e.target.value)} placeholder={t.notesPlaceholder}
+                  className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-none" />
+              </div>
+              <button onClick={handleSave} className="w-full bg-slate-700 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2">
+                {savedNotify ? <><CheckIcon/>{t.btnSaved}</> : t.btnSave}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── TREND & HISTORY ── */}
+      <div className="mt-8 glass p-5">
+        <h2 className="text-base font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4">{t.historyTitle}</h2>
+
+        {history.length > 0 && (
+          <>
+            {/* Trend selector */}
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-slate-600 mb-2">{t.trendTitle} — {t.trendSelect}</p>
+              <div className="flex flex-wrap gap-2">
+                {uniqueNames.map(n=>(
+                  <button key={n} onClick={()=>setTrendName(prev=>prev===n?'':n)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${trendName===n?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+              {trendName && (
+                <div className="mt-3 bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <TrendChart entries={trendEntries} lang={lang} />
+                </div>
+              )}
+            </div>
+
+
+            {/* History table */}
+            <div className="flex justify-end mb-2 gap-2">
+              <button onClick={exportExcel} className="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full flex items-center gap-1 transition-colors">
+                📊 {lang === 'id' ? 'Export ke Excel' : 'Export to Excel'}
+              </button>
+              <button onClick={clearHistory} className="text-xs text-rose-500 bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-full border border-rose-100">
+                {t.clearHistory}
+              </button>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-100">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="p-2.5 text-left">{t.thName}</th>
+                    <th className="p-2.5 text-center">{t.thDate}</th>
+                    <th className="p-2.5 text-center">{t.thMps}</th>
+                    <th className="p-2.5 text-center">{t.thEng}</th>
+                    <th className="p-2.5 text-center">{t.thBurn}</th>
+                    <th className="p-2.5 text-center">{t.thDiag}</th>
+                    <th className="p-2.5 text-left">{t.thNewTask}</th>
+                    <th className="p-2.5 text-left">{t.thRecog}</th>
+                    <th className="p-2.5 text-center">AI</th>
+                  </tr>
+                </thead>
+                <tbody>
+               {history.map(e => (
+                 <React.Fragment key={e.id}>
+                   <tr className="border-t border-slate-100 hover:bg-indigo-50/30">
+                     <td className="p-2.5 font-semibold text-slate-800 whitespace-nowrap">{e.name}</td>
+                     <td className="p-2.5 text-xs text-slate-400 text-center whitespace-nowrap">{e.date.split(',')[0]}</td>
+                     <td className="p-2.5 text-center"><span className="mono font-bold text-indigo-600 text-sm">{e.mps}</span></td>
+                     <td className="p-2.5 text-center"><span className="mono text-xs text-emerald-600 font-semibold">{e.engagementIndex||'—'}</span></td>
+                     <td className="p-2.5 text-center"><span className="mono text-xs text-rose-500 font-semibold">{e.burnoutRisk||'—'}</span></td>
+                     <td className="p-2.5 text-center text-base" title={e.diagnosis}>{diagEmoji(e.diagnosis)}</td>
+                     <td className="p-2.5 text-xs text-slate-500 max-w-[120px] truncate">{e.newTask||'—'}</td>
+                     <td className="p-2.5 text-xs text-slate-500 max-w-[160px] truncate">{e.recognition||'—'}</td>
+                     {/* Tombol Dropdown AI */}
+                     <td className="p-2.5 text-center">
+                       {e.aiAnalysis ? (
+                         <button 
+                           onClick={() => setExpandedRow(prev => prev === e.id ? null : e.id)} 
+                           className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${expandedRow === e.id ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}
+                         >
+                           {expandedRow === e.id ? 'Tutup' : 'Lihat'}
+                         </button>
+                       ) : (
+                         <span className="text-[10px] text-slate-400">—</span>
+                       )}
+                     </td>
+                   </tr>
+
+                   {/* Baris Expandable untuk menampilkan teks AI */}
+                   {expandedRow === e.id && e.aiAnalysis && (
+                     <tr className="bg-indigo-50/50 border-b border-indigo-100">
+                       <td colSpan="9" className="p-4">
+                         <div className="bg-white rounded-xl p-4 border border-indigo-100 shadow-sm fade-in">
+                           <p className="text-xs font-bold text-indigo-800 mb-3 flex items-center gap-1">
+                             <SparkleIcon /> Analisis AI untuk {e.name}:
+                           </p>
+                           <div className="text-[13px] leading-relaxed">
+                             {renderMarkdown(e.aiAnalysis)}
+                           </div>
+                         </div>
+                       </td>
+                     </tr>
+                   )}
+                 </React.Fragment>
+               ))}
+             </tbody>
+              </table>
+            </div>
+          </>
+        )}
+        {history.length === 0 && (
+          <p className="text-center text-slate-400 py-8 text-sm">{t.noHistory}</p>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="mt-6 text-center text-[11px] text-slate-400 pb-6">
+        Leader's Compass V3 · Based on JCM (Hackman & Oldham, 1976), JD-R (Bakker & Demerouti, 2007),
+        Psych. Safety (Edmondson, 1999), Role Clarity (Rizzo et al., 1970), SDT (Ryan & Deci, 2000),
+        UWES (Schaufeli et al., 2002) · Data stored locally, never transmitted.
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
