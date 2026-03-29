@@ -8,11 +8,6 @@ Instead of asking employees to fill forms, this tool turns **informal conversati
 
 ---
 
-## 🚀 Live Demo
-👉 https://anggaconni.github.io/Leader-Compass/
-
----
-
 ## 💡 Why This Exists
 
 Too many organizations claim to "develop people"…  
@@ -77,7 +72,7 @@ This tool integrates multiple research-backed models:
 
 ## 🧪 Status
 
-This is an **early prototype (v3)**.
+This is an **early prototype (v)0.3)**.
 
 Expect:
 - rough edges  
